@@ -1,16 +1,18 @@
 // controllers/userController.js
 const UserModel = require('../models/userModel');
-const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
+
 
 const UserController = {
   getAllUsers: (req, res) => {
     // get all users
     const users = UserModel.getAllUsers((err, result) => {
-      if(err){
-        return res.status(500).json({error: "internul server error"})
+      if (err) {
+        return res.status(500).json({ error: "internul server error" })
       }
 
-      return res.status(200).json({userlist:result})
+      return res.status(200).json({ userlist: result })
 
     });
     // console.log(">>>>>>>............ users", users);
@@ -28,11 +30,13 @@ const UserController = {
 
   createUser: (req, res) => {
     const userData = req.body;
+
     UserModel.createUser(userData, (err, results) => {
       if (err) {
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ error: err });
       }
-      res.json({ id: results.insertId });
+
+      res.status(200).json({ status: true, message: "User register successfully." });
     });
   },
 
@@ -54,40 +58,71 @@ const UserController = {
   forgotPassword: (req, res) => {
     const { email } = req.body;
 
- 
+
     UserModel.getUserByEmail(email, (err, user) => {
       if (err) {
         return res.status(500).json({ error: 'Internal Server Error' });
       }
 
       if (!user) {
-        
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: 'Inveled email address!' });
       }
 
       const resetToken = crypto.randomBytes(20).toString('hex');
-      const resetTokenExpiry = Date.now() + 3600000; 
+      const resetTokenExpiry = Date.now() + 3600000;
 
-      UserModel.updateResetToken(user.id, resetToken, resetTokenExpiry, (updateError, updateResults) => {
-        if (updateError) {
-          return res.status(500).json({ error: 'Internal Server Error' });
+      // const x = Math.floor((Math.random() * 99999999) + 1);
+
+      UserModel.updateResetToken(user.id, resetToken, resetTokenExpiry, async (updateError, updateResults) => {
+        try {
+          if (updateError) {
+            return res.status(500).json({ error: 'Internal Server Error' });
+          }
+
+          const resetLink = `http://localhost:8000/reset-password?token=${resetToken}`;
+          await sendEmail(email, resetLink, "Reset Password Link");
+
+          res.json({ message: 'Password reset link sent to your email' });
         }
-
-        const resetLink = `http://your-app/reset-password?token=${resetToken}`;
-        sendPasswordResetEmail(email, resetLink);
-
-        res.json({ message: 'Password reset instructions sent to your email' });
+        catch (error) {
+          console.log("Error while sending email", error);
+        }
       });
     });
   },
 
-  updateUserdetails: (req, res) => {
-    const userData = req.body;
-    const dd = UserModel.updateUserdetails(userData);
-    console.log(">>>>>>>> mmohit", dd);
-  },
+  changePassword: (req, res) => {
+    const { userId, oldPassword, newPassword, confirmNewPassword } = req.body;
+    // console.log(">>>>>>> mohit body params", userId, oldPassword, newPassword, confirmNewPassword);
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ error: 'New password and confirm new password do not match' });
+    }
 
-  // Add other CRUD methods as needed
+    UserModel.verifyOldPassword(userId, oldPassword, (verifyError, isMatch) => {
+      if (verifyError) {
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+      console.log(">>>>>>>>>> isMatch contoller", isMatch);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Old password is incorrect' });
+      }
+
+      // Change the password
+      UserModel.changePassword(userId, newPassword, (changeError, results) => {
+        if (changeError) {
+          return res.status(500).json({ error: 'Internal Server Error' });
+        }
+        console.log(">>>>>>> results update", results);
+        if (results.affectedRows === 0) {
+          return res.status(404).json({ error: 'User not found or password not updated' });
+        }
+
+        res.status(200).json({ message: 'Password updated successfully' });
+      });
+    });
+  },
 };
+
+
 
 module.exports = UserController;

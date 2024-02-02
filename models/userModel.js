@@ -1,7 +1,6 @@
 // models/userModel.js
 const bcrypt = require('bcrypt');
 const db = require('../config/db');
-const crypto = require('crypto');
 const moment = require('moment');
 
 const UserModel = {
@@ -59,7 +58,7 @@ const UserModel = {
   },
 
   getUserByEmail: (email, callback) => {
-    db.query('SELECT * FROM users WHERE email = ?', [email], (error, results) => {
+    db.query('SELECT id, email  FROM users WHERE email = ?', [email], (error, results) => {
       if (error) {
         return callback(error, null);
       }
@@ -84,9 +83,37 @@ const UserModel = {
     });
   },
 
-  updateUserdetails: (userData, callback) => {
-    return db.query('INSERT INTO userdetails SET ?', userData);
-  }
+  verifyOldPassword: (userId, oldPassword, callback) => {
+    db.query('SELECT password FROM users WHERE id = ?', [userId], (error, results) => {
+      if (error) {
+        return callback(error);
+      }
+      console.log(">>>>>>>>>> mohit results", results[0]);
+      if (results.length === 0) {
+        return callback(null, false); // User not found
+      }
+      
+      const hashedPassword = results[0].password;
+
+      bcrypt.compare(oldPassword, hashedPassword, (compareError, isMatch) => {
+        if (compareError) {
+          return callback(compareError);
+        }
+        console.log(">>>>>>>>>> isMatch", isMatch);
+        callback(null, isMatch);
+      });
+    });
+  },
+
+  changePassword: (userId, newPassword, callback) => {
+    const hashedPassword = bcrypt.hashSync(newPassword, 10); // Hash the new password
+
+    const query = 'UPDATE users SET password = ? WHERE id = ?';
+    db.query(query, [hashedPassword, userId], (error, results) => {
+      callback(error, results);
+    });
+  },
 };
+
 
 module.exports = UserModel;

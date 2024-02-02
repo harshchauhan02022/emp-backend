@@ -3,6 +3,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const userRoutes = require("./routes/userRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 
 dotenv.config();
 
@@ -13,7 +14,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes); // Updated route path
+app.use("/api/events", eventRoutes); // Updated route path
 
 // Start server
 const PORT = process.env.PORT || 8000;
