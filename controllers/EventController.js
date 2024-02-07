@@ -1,8 +1,6 @@
-// controllers/eventController.js
 const eventModel = require('../models/eventModel');
 
 const EventController = {
-  // Get all events
   getAllEvents: (req, res) => {
     eventModel.getAllEvents((err, result) => {
       if (err) {
@@ -12,7 +10,6 @@ const EventController = {
     });
   },
 
-  // Get event by ID
   getEventById: (req, res) => {
     const eventId = req.params.id;
     eventModel.getEventById(eventId, (err, results) => {
@@ -22,11 +19,20 @@ const EventController = {
       res.json(results[0]);
     });
   },
+  getEventsByUserId: (req, res) => {
+    const userId = req.params.user_id;
+    eventModel.getEventsByUserId(userId, (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+      res.json(results);
+    });
+  },
 
-  // Create a new event
+
   createEvent: (req, res) => {
     const eventData = req.body;
-    // console.log(">>>>>>>>>>>>>>Event Data:", eventData);
+    // console.log(">>>>>>>>>>>>>>eventData:", eventData);
 
     eventModel.createEvent(eventData, (err, results) => {
       if (err) {
@@ -37,7 +43,35 @@ const EventController = {
     });
   },
 
-  // Add more event-related methods if needed
+  changedate: (req, res) => {
+    const { userId, olddate, newdate, confirmNewdate } = req.body;
+
+    if (newdate !== confirmNewdate) {
+      return res.status(400).json({ error: 'New date and confirm new date do not match' });
+    }
+
+    eventModel.verifyOlddate(userId, olddate, (verifyError, isMatch) => {
+      if (verifyError) {
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Old date is incorrect' });
+      }
+
+      eventModel.changedate(userId, newdate, (changeError, results) => {
+        if (changeError) {
+          return res.status(500).json({ error: 'Internal Server Error' });
+        }
+
+        if (results.affectedRows === 0) {
+          return res.status(401).json({ error: 'User not found or date not updated' });
+        }
+
+        res.status(200).json({ message: 'Date updated successfully' });
+      });
+    });
+  },
 };
 
 module.exports = EventController;

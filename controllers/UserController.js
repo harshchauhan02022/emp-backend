@@ -1,8 +1,8 @@
-// controllers/userController.js
-const UserModel = require('../models/userModel');
+const Joi = require('joi');
 const crypto = require('crypto');
-const sendEmail = require('../utils/sendEmail');
 
+const UserModel = require('../models/userModel');
+const sendEmail = require('../utils/sendEmail');
 
 const UserController = {
   getAllUsers: (req, res) => {
@@ -31,6 +31,17 @@ const UserController = {
   createUser: (req, res) => {
     const userData = req.body;
 
+    const registerUserSchema = Joi.object({
+      name: Joi.string().min(3).max(30).required(),
+      email: Joi.string().email().required(),
+      password: Joi.string().min(6).required()
+    })
+
+    const { error } = registerUserSchema.validate(userData);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
     UserModel.createUser(userData, (err, results) => {
       if (err) {
         return res.status(500).json({ error: err });
@@ -42,6 +53,16 @@ const UserController = {
 
   loginUser: (req, res) => {
     const { email, password } = req.body;
+
+    const loginSchema = Joi.object({
+      email: Joi.string().email().required(),
+      password: Joi.string().min(6).required()
+    });
+
+    const { error } = loginSchema.validate({ email, password }); // Pass an object containing email and password
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
 
     UserModel.loginUser(email, password, (err, user) => {
       if (err) {
@@ -93,6 +114,18 @@ const UserController = {
 
   changePassword: (req, res) => {
     const { userId, oldPassword, newPassword, confirmNewPassword } = req.body;
+
+    const changePasswordSchema = Joi.object({
+      userId: Joi.string().required(),
+      oldPassword: Joi.string().min(6).required(),
+      newPassword: Joi.string().min(6).required(),
+      confirmNewPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+    });
+    
+    const { error } = changePasswordSchema.validate({ userId, oldPassword, newPassword, confirmNewPassword });
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
     // console.log(">>>>>>> mohit body params", userId, oldPassword, newPassword, confirmNewPassword);
     if (newPassword !== confirmNewPassword) {
       return res.status(400).json({ error: 'New password and confirm new password do not match' });
@@ -114,7 +147,7 @@ const UserController = {
         }
         console.log(">>>>>>> results update", results);
         if (results.affectedRows === 0) {
-          return res.status(404).json({ error: 'User not found or password not updated' });
+          return res.status(401).json({ error: 'User not found or password not updated' });
         }
 
         res.status(200).json({ message: 'Password updated successfully' });

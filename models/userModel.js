@@ -1,5 +1,6 @@
 // models/userModel.js
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const moment = require('moment');
 
@@ -15,12 +16,12 @@ const UserModel = {
   createUser: (userData, callback) => {
     const { name, email, password } = userData;
 
-    bcrypt.hash(password, 10, (hashError, hashedPassword ) => {
+    bcrypt.hash(password, 10, (hashError, hashedPassword) => {
       if (hashError) {
         return callback(hashError, null);
       }
 
-      db.query('INSERT INTO users(name, email, password) VALUES (?, ?,?)', [name, email, hashedPassword ], (error, results) => {
+      db.query('INSERT INTO users(name, email, password) VALUES (?, ?,?)', [name, email, hashedPassword], (error, results) => {
 
         if (error) {
           return callback(error, null);
@@ -31,14 +32,14 @@ const UserModel = {
   },
 
   loginUser: (email, password, callback) => {
-  
+
     db.query('SELECT * FROM users WHERE email = ?', [email], (error, results) => {
       if (error) {
         return callback(error, null);
       }
 
       if (results.length === 0) {
-     return callback(null, null);
+        return callback(null, null);
       }
 
       const user = results[0];
@@ -51,8 +52,11 @@ const UserModel = {
         if (!isMatch) {
           return callback(null, null);
         }
+
+        const token = jwt.sign({ userId: user.id, email: user.email }, 'yourSecretKey', { expiresIn: '1h' });
+
         const { password, ...userData } = user;
-        return callback(null, userData);
+        return callback(null, { user: userData, token });
       });
     });
   },
@@ -64,7 +68,7 @@ const UserModel = {
       }
 
       if (results.length === 0) {
-      
+
         return callback(null, null);
       }
 
@@ -92,7 +96,7 @@ const UserModel = {
       if (results.length === 0) {
         return callback(null, false); // User not found
       }
-      
+
       const hashedPassword = results[0].password;
 
       bcrypt.compare(oldPassword, hashedPassword, (compareError, isMatch) => {
